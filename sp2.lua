@@ -1376,25 +1376,27 @@ local function DisableIdled()
 end
 
 local function SafeRejoin()
-    local success, err = pcall(function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
-    end)
-    if not success then
-        local success2, err2 = pcall(function()
+    -- Jangan gunakan TeleportToPlaceInstance(JobId) karena jika server sebelumnya crash/kick, 
+    -- mencoba masuk ke JobId yang sama akan memicu Error 279 (Server Dead/No Response).
+    pcall(function()
+        local http = game:GetService("HttpService")
+        local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+        
+        if data and data.data and data.data[1] then
+            local rootPlaceId = data.data[1].rootPlaceId
+            
+            if rootPlaceId and rootPlaceId ~= game.PlaceId then
+                -- Jika kita berada di Sea 2 (PlaceId berbeda dengan Sea 1), 
+                -- Langsung paksa kembali ke Sea 1 untuk mencari server baru yang sehat.
+                TeleportService:Teleport(rootPlaceId, Plr)
+            else
+                -- Jika kita sudah di Sea 1, cukup relog ke server Public yang baru
+                TeleportService:Teleport(game.PlaceId, Plr)
+            end
+        else
             TeleportService:Teleport(game.PlaceId, Plr)
-        end)
-        if not success2 or string.find(tostring(err2), "token") or string.find(tostring(err2), "unauthorized") then
-            -- Jika dilarang (restricted/token required), kita paksa balik ke game utama/Sea 1
-            pcall(function()
-                local http = game:GetService("HttpService")
-                local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
-                local rootPlaceId = data.data[1].rootPlaceId
-                if rootPlaceId then
-                    TeleportService:Teleport(rootPlaceId, Plr)
-                end
-            end)
         end
-    end
+    end)
 end
 
 -- Cek status Sea/Dimensi untuk Auto Go to Sea 2
