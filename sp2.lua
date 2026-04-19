@@ -1,10 +1,3 @@
--- Script taken from https://xenoscripts.com website --
-
---[[
-	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-]]
--- https://discord.gg/8wSP7XedR8
-
 if getgenv().taolao_Running then
     warn("Script already running!")
     return
@@ -1102,7 +1095,7 @@ local function PostToWebhook()
         ["embeds"] = {{
             ["description"] = desc,
             ["color"] = tonumber("ffff77", 16),
-            ["footer"] = { ["text"] = string.format("fk taolao • Session: %s • %s", GetSessionTime(), os.date("%x %X")) },
+            ["footer"] = { ["text"] = string.format("hellscape • Session: %s • %s", GetSessionTime(), os.date("%x %X")) },
             ["thumbnail"] = { ["url"] = catLink }
         }}
     }
@@ -1382,6 +1375,28 @@ local function DisableIdled()
     end)
 end
 
+local function SafeRejoin()
+    local success, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+    end)
+    if not success then
+        local success2, err2 = pcall(function()
+            TeleportService:Teleport(game.PlaceId, Plr)
+        end)
+        if not success2 or string.find(tostring(err2), "token") or string.find(tostring(err2), "unauthorized") then
+            -- Jika dilarang (restricted/token required), kita paksa balik ke game utama/Sea 1
+            pcall(function()
+                local http = game:GetService("HttpService")
+                local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+                local rootPlaceId = data.data[1].rootPlaceId
+                if rootPlaceId then
+                    TeleportService:Teleport(rootPlaceId, Plr)
+                end
+            end)
+        end
+    end
+end
+
 local function Func_AutoReconnect()
     if Connections.Reconnect then Connections.Reconnect:Disconnect() end
 
@@ -1406,7 +1421,7 @@ local function Func_AutoReconnect()
                             end
                         end
                         
-                        TeleportService:Teleport(game.PlaceId, Plr)
+                        SafeRejoin()
                     end
                 end
             end)
@@ -1557,7 +1572,7 @@ local function SendSafetyWebhook(targetPlayer, reason)
                 { ["name"] = "Type", ["value"] = reason, ["inline"] = true },
                 { ["name"] = "ID", ["value"] = "```" .. game.JobId .. "```", ["inline"] = false }
             },
-            ["footer"] = { ["text"] = "fk taolao • " .. os.date("%x %X") }
+            ["footer"] = { ["text"] = "hellscape • " .. os.date("%x %X") }
         }}
     }
 
@@ -4266,7 +4281,7 @@ local function Func_ArtifactAutomation()
 end
 
 local Window = Library:CreateWindow({
-	Title = "fk taolao",
+	Title = "Hellscape",
 	Footer = "" .. assetName .. " | DUMPED | LOVE YOU",
 	NotifySide = "Right",
     Icon = tostring(theChosenOne),
@@ -5686,7 +5701,9 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
     GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() 
         local Servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
     end})
-    GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function() Services.TeleportService:Teleport(game.PlaceId, Plr) end })
+    GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function()
+        SafeRejoin()
+    end})
 
     GB.Player.Left.Server:AddToggle("AutoServerhop", { Text = "Auto Serverhop" })
     GB.Player.Left.Server:AddSlider("AutoHopMins", { Text = "Minutes", Default = 30, Min = 0, Max = 300, Compact = true })
@@ -5817,14 +5834,25 @@ TB_Tabs.Waypoint.T3:AddButton("Teleport to Sea 2", function()
         if not root then return end
     end
     
-    local worldIsland = workspace:FindFirstChild("WorldIsland")
-    local door = worldIsland 
-        and worldIsland:FindFirstChild("Model") 
-        and worldIsland.Model:FindFirstChild("Map") 
-        and worldIsland.Model.Map:FindFirstChild("Door") 
-        and worldIsland.Model.Map.Door:FindFirstChild("Cube.003")
+    -- Tunggu WorldIsland dan pintunya memuat (loading)
+    local worldIsland = workspace:WaitForChild("WorldIsland", 5)
+    local door = nil
+
+    if worldIsland then
+        local model = worldIsland:WaitForChild("Model", 3)
+        if model then
+            local map = model:WaitForChild("Map", 3)
+            if map then
+                local doorFolder = map:WaitForChild("Door", 3)
+                if doorFolder then
+                    door = doorFolder:WaitForChild("Cube.003", 3)
+                end
+            end
+        end
+    end
         
     if door then
+        -- Teleport tepat ke depan portal
         root.CFrame = door.CFrame
         task.wait(0.5)
         local prompt = door:FindFirstChildOfClass("ProximityPrompt")
