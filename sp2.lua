@@ -1397,6 +1397,59 @@ local function SafeRejoin()
     end
 end
 
+-- Cek status Sea/Dimensi untuk Auto Go to Sea 2
+local isSea1Cached = false
+task.spawn(function()
+    pcall(function()
+        local http = game:GetService("HttpService")
+        local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+        if data and data.data and data.data[1] then
+            local rootPlaceId = data.data[1].rootPlaceId
+            if game.PlaceId == rootPlaceId then
+                isSea1Cached = true
+            end
+        end
+    end)
+    
+    while task.wait(10) do
+        if Toggles.AutoGoSea2 and Toggles.AutoGoSea2.Value and isSea1Cached then
+            local char = Plr.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                Remotes.TP_Portal:FireServer("World")
+                task.wait(3.5)
+                char = Plr.Character
+                root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local worldIsland = workspace:FindFirstChild("WorldIsland")
+                    local door = nil
+                    if worldIsland then
+                        local model = worldIsland:FindFirstChild("Model")
+                        if model then
+                            local map = model:FindFirstChild("Map")
+                            if map then
+                                local doorFolder = map:FindFirstChild("Door")
+                                if doorFolder then
+                                    door = doorFolder:FindFirstChild("Cube.003")
+                                end
+                            end
+                        end
+                    end
+                    
+                    if door then
+                        root.CFrame = door.CFrame
+                        task.wait(0.5)
+                        local prompt = door:FindFirstChildOfClass("ProximityPrompt")
+                        if prompt then
+                            fireproximityprompt(prompt)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
 local function Func_AutoReconnect()
     if Connections.Reconnect then Connections.Reconnect:Disconnect() end
 
@@ -5696,6 +5749,7 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
     GB.Player.Left.Server:AddToggle("AutoExecuteTeleport", { Text = "Auto Execute On Teleport", Default = false })
 
     GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
+    GB.Player.Left.Server:AddToggle("AutoGoSea2", { Text = "Auto Go to Sea 2", Tooltip = "Otomatis ke portal Sea 2 jika tertahan di Sea 1" })
     GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 
     GB.Player.Left.Server:AddButton({ Text = "Serverhop", Func = function() 
