@@ -5810,29 +5810,15 @@ TB_Tabs.Waypoint.T3:AddButton("Teleport to Sea 2", function()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    local worldCrystal = IslandCrystals["World"]
-    local needsTeleport = false
+    -- Langsung teleport ke World Island tanpa mengecek jarak
+    Remotes.TP_Portal:FireServer("World")
+    Library:Notify("Teleporting to World Island first...", 3)
+    task.wait(3.5) -- Tunggu layar loading/teleport selesai
     
-    -- Cek jika pulau sudah ada tapi jaraknya terlalu jauh (di luar pulau)
-    if worldCrystal then
-        local dist = (root.Position - worldCrystal:GetPivot().Position).Magnitude
-        if dist > 3000 then -- Jika radius dari pulau world lebih dari 3000 stud, teleport dulu
-            needsTeleport = true
-        end
-    else
-        needsTeleport = true
-    end
-
-    if needsTeleport then
-        Remotes.TP_Portal:FireServer("World")
-        Library:Notify("Teleporting to World Island first...", 3)
-        task.wait(3.5) -- Tunggu layar loading/teleport selesai
-        
-        -- Update karakter setelah pindah/respawn dari portal
-        char = Plr.Character
-        root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-    end
+    -- Update karakter setelah pindah/respawn dari portal
+    char = Plr.Character
+    root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
     
     -- Tunggu WorldIsland dan pintunya memuat (loading)
     local worldIsland = workspace:WaitForChild("WorldIsland", 5)
