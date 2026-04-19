@@ -5686,12 +5686,12 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
     GB.Player.Left.Server:AddToggle("AntiKick", { Text = "Anti Kick (Client)" })
 
     GB.Player.Left.Server:AddInput("AutoExecuteStr", {
-        Default = 'loadstring(game:HttpGet("MASUKKAN_LINK_SCRIPT_ANDA_DISINI"))()',
         Numeric = false,
         Finished = true,
         Text = "Script Auto-Exec (Loadstring/File)",
-        Tooltip = "Contoh: loadstring(game:HttpGet('...'))() atau loadstring(readfile('namafile.lua'))()",
+        Tooltip = "Contoh: loadstring(game:HttpGet('https://raw.githubusercontent.com/danielaugust67/SP/main/sp2.lua'))()",
         Placeholder = "Ketik script...",
+        Default = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/danielaugust67/SP/main/sp2.lua"))()',
     })
     GB.Player.Left.Server:AddToggle("AutoExecuteTeleport", { Text = "Auto Execute On Teleport", Default = false })
 
