@@ -1,7 +1,9 @@
-if getgenv().taolao_Running then
+local env = (type(getgenv) == "function" and getgenv()) or _G
+if env.taolao_Running then
     warn("Script already running!")
     return
 end
+env.taolao_Running = true
 
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game.GameId ~= 0
@@ -1393,7 +1395,7 @@ local function RejoinErrorFallback()
         end)
         
         if success and result then
-            rootPlaceId = result
+            rootPlaceId = res
         end
         
         TeleportService:Teleport(rootPlaceId, Plr)
