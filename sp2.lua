@@ -1421,13 +1421,6 @@
             local privateCode = ExtractPrivateServerCode(privateInput)
 
             if privateCode and privateCode ~= "" then
-                local okPrivate = pcall(function()
-                    TeleportService:TeleportToPrivateServer(rootPlaceId, privateCode, {Plr})
-                end)
-                if okPrivate then
-                    return
-                end
-
                 local okPrivateAsync = pcall(function()
                     local opts = Instance.new("TeleportOptions")
                     opts.ReservedServerAccessCode = privateCode
