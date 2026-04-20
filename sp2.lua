@@ -6597,7 +6597,8 @@
                         end
                     end
 
-                    if currentDist < 35 then
+                    local hitRange = tonumber(Options.KillAuraRange and Options.KillAuraRange.Value) or 35
+                    if currentDist < hitRange then
                         if math.abs(root.Position.Y - npcRoot.Position.Y) > 50 then
                             root.Velocity = Vector3.new(0, -100, 0)
                         end
