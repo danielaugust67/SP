@@ -237,7 +237,7 @@
         
         LastM1 = 0,
         LastWRSwitch = 0,
-        LastSwitch = { Title = "", Rune = "" },
+        LastSwitch = { Title = "", Rune = "", Build = "", WeaponType = "" },
         LastBuildSwitch = 0,
         LastDungeon = 0,
         
@@ -2715,7 +2715,8 @@
         local types = {
             { id = "Title", remote = Remotes.EquipTitle, method = function(val) return val end },
             { id = "Rune", remote = Remotes.EquipRune, method = function(val) return {"Equip", val} end },
-            { id = "Build", remote = Remotes.LoadoutLoad, method = function(val) return tonumber(val) end }
+            { id = "Build", remote = Remotes.LoadoutLoad, method = function(val) return tonumber(val) end },
+            { id = "WeaponType", remote = nil, method = function(val) return val end }
         }
 
         for _, switch in ipairs(types) do
@@ -2750,14 +2751,18 @@
             end
 
             if finalEquipValue ~= Shared.LastSwitch[switch.id] then
-                local args = switch.method(finalEquipValue)
-                pcall(function()
-                    if type(args) == "table" then 
-                        switch.remote:FireServer(unpack(args))
-                    else 
-                        switch.remote:FireServer(args) 
-                    end
-                end)
+                if switch.id == "WeaponType" then
+                    Options.SelectedWeaponType:SetValue({[finalEquipValue] = true})
+                else
+                    local args = switch.method(finalEquipValue)
+                    pcall(function()
+                        if type(args) == "table" then 
+                            switch.remote:FireServer(unpack(args))
+                        else 
+                            switch.remote:FireServer(args) 
+                        end
+                    end)
+                end
                 
                 Shared.LastSwitch[switch.id] = finalEquipValue
                 
@@ -3577,7 +3582,28 @@
         elseif posType == "Below" then
             finalPos = targetPos + Vector3.new(0, -distVal, 0)
         elseif posType == "Center" then
-            finalPos = targetPos
+            local sumPos = targetPos
+            local count = 1
+            local cleanTargetName = target.Name:gsub("%d+$", "")
+            
+            for _, v in ipairs(PATH.Mobs:GetChildren()) do
+                if v ~= target and v.Name:gsub("%d+$", "") == cleanTargetName then
+                    local hum = v:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        local vPos = v:GetPivot().Position
+                        if (vPos - targetPos).Magnitude <= 40 then
+                            sumPos = sumPos + vPos
+                            count = count + 1
+                        end
+                    end
+                end
+            end
+            finalPos = sumPos / count
+        elseif posType == "Orbit" then
+            local speed = 2
+            local orbitAngle = tick() * speed
+            local orbitDist = distVal
+            finalPos = targetPos + Vector3.new(math.cos(orbitAngle) * orbitDist, 0, math.sin(orbitAngle) * orbitDist)
         else
             finalPos = (targetPivot * CFrame.new(0, 0, distVal)).Position
         end
@@ -5099,7 +5125,7 @@
 
     TB_Tabs.Autofarm.T4:AddDropdown("SelectedFarmType", {
         Text = "Select Farm Type",
-        Values = {"Behind", "Above", "Below", "Center"},
+        Values = {"Behind", "Above", "Below", "Center", "Orbit"},
         Default = "Behind",
         Multi = false,
         Searchable = true,
@@ -5284,6 +5310,7 @@
     CreateSwitchGroup(TB_Tabs.Switch.T1, "Title", "Title", CombinedTitleList)
     CreateSwitchGroup(TB_Tabs.Switch.T2, "Rune", "Rune", Tables.RuneList)
     CreateSwitchGroup(TB_Tabs.Switch.T3, "Build", "Build", Tables.BuildList)
+    CreateSwitchGroup(TB_Tabs.Switch.T3, "WeaponType", "Weapon Type", Tables.Weapon)
 
     TB_Tabs.MiscAuto_Left.T1:AddToggle("AutoAscend", {
         Text = "Auto Ascend",
