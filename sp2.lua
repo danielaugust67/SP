@@ -1425,6 +1425,15 @@
             local targetPlaceId = privatePlaceId or rootPlaceId
 
             if privateCode and privateCode ~= "" then
+                -- Best effort AFK auto-join:
+                -- coba masuk ke instance server yang sama dulu (jika server masih hidup).
+                local okSameJob = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+                end)
+                if okSameJob then
+                    return
+                end
+
                 -- NOTE:
                 -- privateServerLinkCode (URL private server) bukan ReservedServerAccessCode.
                 -- TeleportAsync dari client tidak bisa langsung join private server dari code URL ini.
