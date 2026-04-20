@@ -2752,7 +2752,19 @@
 
             if finalEquipValue ~= Shared.LastSwitch[switch.id] then
                 if switch.id == "WeaponType" then
-                    Options.SelectedWeaponType:SetValue({[finalEquipValue] = true})
+                    local desiredTypes = {}
+                    if type(finalEquipValue) == "table" then
+                        desiredTypes = finalEquipValue
+                    elseif finalEquipValue and finalEquipValue ~= "" then
+                        desiredTypes[tostring(finalEquipValue)] = true
+                    end
+
+                    if next(desiredTypes) then
+                        Options.SelectedWeaponType:SetValue(desiredTypes)
+                        Shared.ActiveWeap = ""
+                        Shared.WeapRotationIdx = 0
+                        Shared.LastWRSwitch = 0
+                    end
                 else
                     local args = switch.method(finalEquipValue)
                     pcall(function()
@@ -3712,7 +3724,15 @@
             local toolName = tool.Name
             local toolType = GetToolTypeFromModule(toolName)
             local useMode = Options.AutoSkillType.Value
-            local selected = Options.SelectedSkills.Value or {}
+            local isBossTarget = false
+            if target and target.Parent then
+                isBossTarget = target.Name:find("Boss") and not table.find(Tables.MiniBossList, target.Name)
+            end
+
+            local selected = (isBossTarget and Options.SelectedSkills_Boss.Value) or Options.SelectedSkills_Mob.Value or {}
+            if not next(selected) then
+                selected = Options.SelectedSkills.Value or {}
+            end
 
             if useMode == "Instant" then
                 for _, key in ipairs(priority) do
@@ -5235,7 +5255,23 @@
     TB_Tabs.MiscAuto.T2:AddLabel("Mode:\n- <b>Normal:</b> Check skill cooldowns\n- <b>Instant:</b> No check (may affect performance when use in long time.)", true)
 
     TB_Tabs.MiscAuto.T2:AddDropdown("SelectedSkills", {
-        Text = "Select Skills",
+        Text = "Select Skills [Legacy]",
+        Values = {"Z", "X", "C", "V", "F"},
+        Default = nil,
+        Multi = true,
+        Searchable = true,
+    })
+
+    TB_Tabs.MiscAuto.T2:AddDropdown("SelectedSkills_Mob", {
+        Text = "Select Skills [Mob]",
+        Values = {"Z", "X", "C", "V", "F"},
+        Default = nil,
+        Multi = true,
+        Searchable = true,
+    })
+
+    TB_Tabs.MiscAuto.T2:AddDropdown("SelectedSkills_Boss", {
+        Text = "Select Skills [Boss]",
         Values = {"Z", "X", "C", "V", "F"},
         Default = nil,
         Multi = true,
