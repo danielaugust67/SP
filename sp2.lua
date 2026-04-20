@@ -1375,27 +1375,28 @@ local function DisableIdled()
     end)
 end
 
-local function SafeRejoin()
-    -- Jangan gunakan TeleportToPlaceInstance(JobId) karena jika server sebelumnya crash/kick, 
-    -- mencoba masuk ke JobId yang sama akan memicu Error 279 (Server Dead/No Response).
+local function RejoinServer()
+    -- Coba masuk ke server yang sama melalui JobId
     pcall(function()
-        local http = game:GetService("HttpService")
-        local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+    end)
+end
+
+local function RejoinErrorFallback()
+    -- Jika mati / error kick, kita terpaksa lewati ke Root Place (Lobby Sea 1)
+    pcall(function()
+        local rootPlaceId = game.PlaceId
+        local success, result = pcall(function()
+            local http = game:GetService("HttpService")
+            local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+            return data.data[1].rootPlaceId
+        end)
         
-        if data and data.data and data.data[1] then
-            local rootPlaceId = data.data[1].rootPlaceId
-            
-            if rootPlaceId and rootPlaceId ~= game.PlaceId then
-                -- Jika kita berada di Sea 2 (PlaceId berbeda dengan Sea 1), 
-                -- Langsung paksa kembali ke Sea 1 untuk mencari server baru yang sehat.
-                TeleportService:Teleport(rootPlaceId, Plr)
-            else
-                -- Jika kita sudah di Sea 1, cukup relog ke server Public yang baru
-                TeleportService:Teleport(game.PlaceId, Plr)
-            end
-        else
-            TeleportService:Teleport(game.PlaceId, Plr)
+        if success and result then
+            rootPlaceId = result
         end
+        
+        TeleportService:Teleport(rootPlaceId, Plr)
     end)
 end
 
@@ -1469,7 +1470,7 @@ local function Func_AutoRejoin()
                     end
                 end
                 
-                SafeRejoin()
+                RejoinErrorFallback()
             end)
         end)
     end)
@@ -5756,7 +5757,7 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
                 pcall(queue_on_teleport, code)
             end
         end
-        SafeRejoin()
+        RejoinServer()
     end})
 
     GB.Player.Left.Server:AddToggle("AutoServerhop", { Text = "Auto Serverhop" })
