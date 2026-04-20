@@ -1414,7 +1414,7 @@ task.spawn(function()
         end
     end)
     
-    while task.wait(10) do
+    while task.wait(4) do
         if Toggles.AutoGoSea2 and Toggles.AutoGoSea2.Value and isSea1Cached then
             local char = Plr.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1456,13 +1456,40 @@ end)
 local function Func_AutoRejoin()
     if Connections.Reconnect then Connections.Reconnect:Disconnect() end
 
-    Connections.Reconnect = GuiService.ErrorMessageChanged:Connect(function()
-        if not Toggles.AutoRejoin.Value then return end
+    -- Ganti event dengan custom loop yang aman di executor mobile
+    local function RejoinLoop()
+        while task.wait(1) do
+            if not Toggles.AutoRejoin or not Toggles.AutoRejoin.Value then continue end
 
-        -- Tunggu beberapa detik agar koneksi benar-benar ditutup oleh Roblox, 
-        -- lalu langsung lakukan rue-join (SafeRejoin) tanpa harus mencari UI Error.
-        task.delay(2, function()
+            local disconnected = false
+            
+            -- Cek CoreGui UI
             pcall(function()
+                local promptOverlay = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
+                if promptOverlay and promptOverlay:FindFirstChild("promptOverlay") then
+                    local errorPrompt = promptOverlay.promptOverlay:FindFirstChild("ErrorPrompt")
+                    if errorPrompt and errorPrompt.Visible then
+                        disconnected = true
+                    end
+                end
+            end)
+            
+            -- Cek Pesan Error Bawaan GuiService 
+            -- (Mencegah false positive jika GetErrorMessage kosong/nil)
+            if not disconnected then
+                pcall(function()
+                    local err = GuiService:GetErrorMessage()
+                    if err and typeof(err) == "string" and string.len(err) > 2 then
+                        disconnected = true
+                    end
+                end)
+            end
+            
+            if disconnected then
+                -- Jeda sebentar sebelum teleport
+                task.wait(4)
+                
+                -- Trigger Executor Queue On Teleport
                 if Support.QueueOnTeleport and Toggles.AutoExecuteTeleport.Value then
                     local code = Options.AutoExecuteStr.Value
                     if code and code ~= "" then
@@ -1471,9 +1498,13 @@ local function Func_AutoRejoin()
                 end
                 
                 RejoinErrorFallback()
-            end)
-        end)
-    end)
+                break -- hentikan loop sementara menyiapkan teleport
+            end
+        end
+    end
+    
+    Connections.Reconnect = task.spawn(RejoinLoop)
+end
     
     if Support.QueueOnTeleport then
         if Connections.TeleportQueue then Connections.TeleportQueue:Disconnect() end
