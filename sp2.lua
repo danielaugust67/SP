@@ -244,6 +244,11 @@
         AltDamage = {},
         AltActive = false,
         TradeState = {},
+        CachedSea1Private = {
+            PlaceId = 0,
+            JobId = "",
+            PrivateServerId = "",
+        },
     }
 
     local Script_Start_Time = os.time()
@@ -1426,6 +1431,18 @@
 
             if privateCode and privateCode ~= "" then
                 -- Best effort AFK auto-join:
+                -- jika kita punya cache server Sea 1 private yang sama, coba ke sana dulu.
+                local cached = Shared.CachedSea1Private
+                if cached and cached.PlaceId and cached.PlaceId > 0 and cached.JobId and cached.JobId ~= "" then
+                    local okSea1Cached = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(cached.PlaceId, cached.JobId, Plr)
+                    end)
+                    if okSea1Cached then
+                        return
+                    end
+                end
+
+                -- Best effort AFK auto-join:
                 -- coba masuk ke instance server yang sama dulu (jika server masih hidup).
                 local okSameJob = pcall(function()
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
@@ -1466,6 +1483,17 @@
         end)
         
         while task.wait(4) do
+            pcall(function()
+                isSea1Cached = (game.PlaceId == GetRootPlaceId())
+
+                -- Simpan instance Sea 1 private agar bisa dipakai saat kick dari Sea 2.
+                if isSea1Cached and game.PrivateServerId and game.PrivateServerId ~= "" and game.JobId and game.JobId ~= "" then
+                    Shared.CachedSea1Private.PlaceId = game.PlaceId
+                    Shared.CachedSea1Private.JobId = game.JobId
+                    Shared.CachedSea1Private.PrivateServerId = game.PrivateServerId
+                end
+            end)
+
             if Toggles.AutoGoSea2 and Toggles.AutoGoSea2.Value and isSea1Cached then
                 local char = Plr.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
