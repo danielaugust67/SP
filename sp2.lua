@@ -5749,6 +5749,13 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
         local Servers = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
     end})
     GB.Player.Left.Server:AddButton({ Text = "Rejoin", Func = function()
+        -- Simulasi antrean script yang sama seperti saat error terdeteksi untuk test button
+        if Support.QueueOnTeleport and Toggles.AutoExecuteTeleport.Value then
+            local code = Options.AutoExecuteStr.Value
+            if code and code ~= "" then
+                pcall(queue_on_teleport, code)
+            end
+        end
         SafeRejoin()
     end})
 
