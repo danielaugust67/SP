@@ -1458,27 +1458,18 @@ local function Func_AutoReconnect()
     Connections.Reconnect = GuiService.ErrorMessageChanged:Connect(function()
         if not Toggles.AutoReconnect.Value then return end
 
-        task.delay(2, function()
+        -- Tunggu beberapa detik agar koneksi benar-benar ditutup oleh Roblox, 
+        -- lalu langsung lakukan re-join (SafeRejoin) tanpa harus mencari UI Error.
+        task.delay(5, function()
             pcall(function()
-                local promptOverlay = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
-                if promptOverlay then
-                    local errorPrompt = promptOverlay.promptOverlay:FindFirstChild("ErrorPrompt")
-                    
-                    if errorPrompt and errorPrompt.Visible then
-                        local secondaryTimer = 5
-                        
-                        task.wait(secondaryTimer)
-                        
-                        if Support.QueueOnTeleport and Toggles.AutoExecuteTeleport.Value then
-                            local code = Options.AutoExecuteStr.Value
-                            if code and code ~= "" then
-                                pcall(queue_on_teleport, code)
-                            end
-                        end
-                        
-                        SafeRejoin()
+                if Support.QueueOnTeleport and Toggles.AutoExecuteTeleport.Value then
+                    local code = Options.AutoExecuteStr.Value
+                    if code and code ~= "" then
+                        pcall(queue_on_teleport, code)
                     end
                 end
+                
+                SafeRejoin()
             end)
         end)
     end)
