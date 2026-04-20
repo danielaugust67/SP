@@ -1396,19 +1396,22 @@
         return rootPlaceId
     end
 
-    local function ExtractPrivateServerCode(raw)
-        if type(raw) ~= "string" then return nil end
+    local function ExtractPrivateServerData(raw)
+        if type(raw) ~= "string" then return nil, nil end
         local s = raw:gsub("%s+", "")
-        if s == "" then return nil end
+        if s == "" then return nil, nil end
 
         local code = s:match("[?&]privateServerLinkCode=([^&]+)")
             or s:match("[?&]code=([^&]+)")
+
+        local placeIdStr = s:match("/games/(%d+)")
+        local placeId = placeIdStr and tonumber(placeIdStr) or nil
 
         if not code and not s:find("https?://") and not s:find("/") then
             code = s
         end
 
-        return code
+        return code, placeId
     end
 
     local function RejoinErrorFallback()
@@ -1418,13 +1421,14 @@
             local rootPlaceId = GetRootPlaceId()
 
             local privateInput = Options and Options.PrivateServerCode and Options.PrivateServerCode.Value
-            local privateCode = ExtractPrivateServerCode(privateInput)
+            local privateCode, privatePlaceId = ExtractPrivateServerData(privateInput)
+            local targetPlaceId = privatePlaceId or rootPlaceId
 
             if privateCode and privateCode ~= "" then
                 local okPrivateAsync = pcall(function()
                     local opts = Instance.new("TeleportOptions")
                     opts.ReservedServerAccessCode = privateCode
-                    TeleportService:TeleportAsync(rootPlaceId, {Plr}, opts)
+                    TeleportService:TeleportAsync(targetPlaceId, {Plr}, opts)
                 end)
                 if okPrivateAsync then
                     return
@@ -5811,7 +5815,7 @@
             Text = "Private Server Link/Code",
             Tooltip = "Paste link dengan privateServerLinkCode=... atau share?code=...",
             Placeholder = "privateServerLinkCode / share link",
-            Default = "73004691240341998620161341311347",
+            Default = "https://www.roblox.com/games/77747658251236/Sailor-Piece?privateServerLinkCode=73004691240341998620161341311347",
         })
         GB.Player.Left.Server:AddToggle("AutoExecuteTeleport", { Text = "Auto Execute On Teleport", Default = false })
 
