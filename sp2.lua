@@ -1425,17 +1425,23 @@
             local targetPlaceId = privatePlaceId or rootPlaceId
 
             if privateCode and privateCode ~= "" then
-                local okPrivateAsync = pcall(function()
-                    local opts = Instance.new("TeleportOptions")
-                    opts.ReservedServerAccessCode = privateCode
-                    TeleportService:TeleportAsync(targetPlaceId, {Plr}, opts)
-                end)
-                if okPrivateAsync then
-                    return
+                -- NOTE:
+                -- privateServerLinkCode (URL private server) bukan ReservedServerAccessCode.
+                -- TeleportAsync dari client tidak bisa langsung join private server dari code URL ini.
+                -- Jadi fallback terbaik: bantu user buka/copy link private server mereka.
+                local privateUrl = nil
+                if type(privateInput) == "string" and privateInput:find("https?://") then
+                    privateUrl = privateInput
+                else
+                    privateUrl = string.format("https://www.roblox.com/games/%d/Sailor-Piece?privateServerLinkCode=%s", targetPlaceId, privateCode)
                 end
 
-                -- Jika user sudah mengisi kode private server, jangan pernah jatuh ke public server.
-                Library:Notify("Private rejoin failed. Check your privateServerLinkCode.", 5)
+                if Support.Clipboard and setclipboard and privateUrl then
+                    pcall(setclipboard, privateUrl)
+                    Library:Notify("Private link copied. Re-open Roblox via your private link.", 7)
+                else
+                    Library:Notify("Private rejoin requires opening your private server link manually.", 7)
+                end
                 return
             end
 
