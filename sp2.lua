@@ -1419,6 +1419,9 @@
         return code, placeId
     end
 
+    local RefreshMobData
+    local PopulateNPCLists
+
     local function RejoinErrorFallback()
         -- Selalu arahkan ke Sea 1 (Root Place) untuk menghindari Error 279 dan Error Restricted Place.
         -- Nanti script akan otomatis jalan ke Sea 2 berkat fitur "Auto Go To Sea 2".
@@ -1477,9 +1480,11 @@
 
     -- Cek status Sea/Dimensi untuk Auto Go to Sea 2
     local isSea1Cached = false
+    local wasSea1Cached = nil
     task.spawn(function()
         pcall(function()
             isSea1Cached = (game.PlaceId == GetRootPlaceId())
+            wasSea1Cached = isSea1Cached
         end)
         
         while task.wait(4) do
@@ -1493,6 +1498,14 @@
                     Shared.CachedSea1Private.PrivateServerId = game.PrivateServerId
                 end
             end)
+
+            if wasSea1Cached == true and isSea1Cached == false and RefreshMobData then
+                task.spawn(function()
+                    task.wait(1.5)
+                    RefreshMobData("Sea2 transition")
+                end)
+            end
+            wasSea1Cached = isSea1Cached
 
             if Toggles.AutoGoSea2 and Toggles.AutoGoSea2.Value and isSea1Cached then
                 local char = Plr.Character
@@ -1905,17 +1918,18 @@
 
     local function UpdateNPCLists()
         local specialMobs = {"ThiefBoss", "MonkeyBoss", "DesertBoss", "SnowBoss", "PandaMiniBoss"}
-        
-        local currentList = {}
-        for _, name in pairs(Tables.MobList) do currentList[name] = true end
+
+        table.clear(Tables.MobList)
+        table.clear(Tables.MobToIsland)
+        local unique = {}
 
         for _, v in pairs(PATH.Mobs:GetChildren()) do
             local cleanName = v.Name:gsub("%d+$", "") 
             local isSpecial = table.find(specialMobs, cleanName)
             
-            if (isSpecial or not cleanName:find("Boss")) and not currentList[cleanName] then
+            if (isSpecial or not cleanName:find("Boss")) and not unique[cleanName] then
                 table.insert(Tables.MobList, cleanName)
-                currentList[cleanName] = true
+                unique[cleanName] = true
                 
                 local npcPos = v:GetPivot().Position
                 local closestIsland = "Unknown"
@@ -1934,8 +1948,12 @@
                 Tables.MobToIsland[cleanName] = closestIsland
             end
         end
+
+        table.sort(Tables.MobList)
         
-        Options.SelectedMob:SetValues(Tables.MobList)
+        if Options.SelectedMob then
+            Options.SelectedMob:SetValues(Tables.MobList)
+        end
     end
 
     local function UpdateAllEntities()
@@ -1954,19 +1972,70 @@
         end
     end
 
-    local function PopulateNPCLists()
+    RefreshMobData = function(reason)
+        local attempts = 0
+        local maxAttempts = 6
+
+        task.spawn(function()
+            while attempts < maxAttempts do
+                attempts = attempts + 1
+
+                local hasMobs = PATH.Mobs and #PATH.Mobs:GetChildren() > 0
+                if hasMobs then
+                    UpdateNPCLists()
+                    UpdateAllEntities()
+                    if PopulateNPCLists then
+                        PopulateNPCLists()
+                    end
+                    return
+                end
+
+                task.wait(0.8)
+            end
+
+            -- Tetap refresh sekali terakhir walau folder mob terlambat loaded.
+            UpdateNPCLists()
+            UpdateAllEntities()
+            if PopulateNPCLists then
+                PopulateNPCLists()
+            end
+        end)
+    end
+
+    PopulateNPCLists = function()
+        table.clear(Tables.NPC_QuestList)
+        table.insert(Tables.NPC_QuestList, "DungeonUnlock")
+        table.insert(Tables.NPC_QuestList, "SlimeKeyUnlock")
+
+        table.clear(Tables.NPC_MovesetList)
+        table.clear(Tables.NPC_MasteryList)
+        table.clear(Tables.AllNPCList)
+
+        local questUnique = {
+            ["DungeonUnlock"] = true,
+            ["SlimeKeyUnlock"] = true
+        }
+        local allNpcUnique = {}
+
         for _, child in ipairs(workspace:GetChildren()) do
             if child.Name:match("^QuestNPC%d+$") then
-                if not table.find(Tables.NPC_QuestList, child.Name) then
+                if not questUnique[child.Name] then
                     table.insert(Tables.NPC_QuestList, child.Name)
+                    questUnique[child.Name] = true
                 end
             end
         end
 
         for _, child in ipairs(PATH.InteractNPCs:GetChildren()) do
+            if not allNpcUnique[child.Name] then
+                table.insert(Tables.AllNPCList, child.Name)
+                allNpcUnique[child.Name] = true
+            end
+
             if child.Name:match("^QuestNPC%d+$") then
-                if not table.find(Tables.NPC_QuestList, child.Name) then
+                if not questUnique[child.Name] then
                     table.insert(Tables.NPC_QuestList, child.Name)
+                    questUnique[child.Name] = true
                 end
             end
         end
@@ -1990,6 +2059,20 @@
         end
         table.sort(Tables.NPC_MovesetList)
         table.sort(Tables.NPC_MasteryList)
+        table.sort(Tables.AllNPCList)
+
+        if Options.SelectedQuestNPC then
+            Options.SelectedQuestNPC:SetValues(Tables.NPC_QuestList)
+        end
+        if Options.SelectedMovesetNPC then
+            Options.SelectedMovesetNPC:SetValues(Tables.NPC_MovesetList)
+        end
+        if Options.SelectedMasteryNPC then
+            Options.SelectedMasteryNPC:SetValues(Tables.NPC_MasteryList)
+        end
+        if Options.SelectedMiscAllNPC then
+            Options.SelectedMiscAllNPC:SetValues(Tables.AllNPCList)
+        end
     end
 
     local function GetCurrentPity()
@@ -6891,8 +6974,7 @@
     Options.Eq_MS:SetValues(allStats)
     Options.Eq_SS:SetValues(allStats)
 
-    UpdateNPCLists()
-    UpdateAllEntities()
+    RefreshMobData("Startup execute")
     InitAutoKick()
     ACThing(true)
 
