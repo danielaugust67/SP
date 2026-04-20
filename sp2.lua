@@ -1376,21 +1376,27 @@ local function DisableIdled()
 end
 
 local function RejoinServer()
-    -- Coba masuk ke server yang sama melalui JobId
     pcall(function()
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+        TeleportService:Teleport(game.PlaceId, Plr)
     end)
 end
 
 local function RejoinErrorFallback()
-    -- Prioritaskan untuk bergabung ke server yang SAMA (Sangat berguna untuk Private Server)
-    -- Catatan: Roblox MUNGKIN memblokir relog langsung ke dalam Sub-Place/Sea 2 (Restricted) jika JobId ditutup/mati.
+    -- Selalu arahkan ke Sea 1 (Root Place) untuk menghindari Error 279 dan Error Restricted Place.
+    -- Nanti script akan otomatis jalan ke Sea 2 berkat fitur "Auto Go To Sea 2".
     pcall(function()
-        if game.JobId and game.JobId ~= "" then
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
-        else
-            TeleportService:Teleport(game.PlaceId, Plr)
+        local rootPlaceId = game.PlaceId
+        local success, result = pcall(function()
+            local http = game:GetService("HttpService")
+            local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+            return data.data[1].rootPlaceId
+        end)
+        
+        if success and result then
+            rootPlaceId = result
         end
+        
+        TeleportService:Teleport(rootPlaceId, Plr)
     end)
 end
 
