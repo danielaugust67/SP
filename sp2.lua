@@ -1383,21 +1383,24 @@ local function RejoinServer()
     end)
 end
 
+local function GetRootPlaceId()
+    local rootPlaceId = game.PlaceId
+    local ok, result = pcall(function()
+        local http = game:GetService("HttpService")
+        local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
+        return data and data.data and data.data[1] and data.data[1].rootPlaceId
+    end)
+    if ok and result then
+        rootPlaceId = result
+    end
+    return rootPlaceId
+end
+
 local function RejoinErrorFallback()
     -- Selalu arahkan ke Sea 1 (Root Place) untuk menghindari Error 279 dan Error Restricted Place.
     -- Nanti script akan otomatis jalan ke Sea 2 berkat fitur "Auto Go To Sea 2".
     pcall(function()
-        local rootPlaceId = game.PlaceId
-        local success, result = pcall(function()
-            local http = game:GetService("HttpService")
-            local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
-            return data.data[1].rootPlaceId
-        end)
-        
-        if success and result then
-            rootPlaceId = res
-        end
-        
+        local rootPlaceId = GetRootPlaceId()
         TeleportService:Teleport(rootPlaceId, Plr)
     end)
 end
@@ -1406,14 +1409,7 @@ end
 local isSea1Cached = false
 task.spawn(function()
     pcall(function()
-        local http = game:GetService("HttpService")
-        local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
-        if data and data.data and data.data[1] then
-            local rootPlaceId = data.data[1].rootPlaceId
-            if game.PlaceId == rootPlaceId then
-                isSea1Cached = true
-            end
-        end
+        isSea1Cached = (game.PlaceId == GetRootPlaceId())
     end)
     
     while task.wait(4) do
@@ -1456,7 +1452,10 @@ task.spawn(function()
 end)
 
 local function Func_AutoRejoin()
-    if Connections.Reconnect then Connections.Reconnect:Disconnect() end
+    if Connections.Reconnect then
+        pcall(task.cancel, Connections.Reconnect)
+        Connections.Reconnect = nil
+    end
 
     -- Ganti event dengan custom loop yang aman di executor mobile
     local function RejoinLoop()
@@ -1504,10 +1503,9 @@ local function Func_AutoRejoin()
             end
         end
     end
-    
+
     Connections.Reconnect = task.spawn(RejoinLoop)
-end
-    
+
     if Support.QueueOnTeleport then
         if Connections.TeleportQueue then Connections.TeleportQueue:Disconnect() end
         Connections.TeleportQueue = Plr.OnTeleport:Connect(function(state)
