@@ -1452,15 +1452,15 @@ task.spawn(function()
     end
 end)
 
-local function Func_AutoReconnect()
+local function Func_AutoRejoin()
     if Connections.Reconnect then Connections.Reconnect:Disconnect() end
 
     Connections.Reconnect = GuiService.ErrorMessageChanged:Connect(function()
-        if not Toggles.AutoReconnect.Value then return end
+        if not Toggles.AutoRejoin.Value then return end
 
         -- Tunggu beberapa detik agar koneksi benar-benar ditutup oleh Roblox, 
-        -- lalu langsung lakukan re-join (SafeRejoin) tanpa harus mencari UI Error.
-        task.delay(5, function()
+        -- lalu langsung lakukan rue-join (SafeRejoin) tanpa harus mencari UI Error.
+        task.delay(2, function()
             pcall(function()
                 if Support.QueueOnTeleport and Toggles.AutoExecuteTeleport.Value then
                     local code = Options.AutoExecuteStr.Value
@@ -5741,7 +5741,7 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
     })
     GB.Player.Left.Server:AddToggle("AutoExecuteTeleport", { Text = "Auto Execute On Teleport", Default = false })
 
-    GB.Player.Left.Server:AddToggle("AutoReconnect", { Text = "Auto Reconnect" })
+    GB.Player.Left.Server:AddToggle("AutoRejoin", { Text = "Auto Rejoin" })
     GB.Player.Left.Server:AddToggle("AutoGoSea2", { Text = "Auto Go to Sea 2", Tooltip = "Otomatis ke portal Sea 2 jika tertahan di Sea 1" })
     GB.Player.Left.Server:AddToggle("NoGameplayPaused", { Text = "No Gameplay Paused"})
 
@@ -6335,8 +6335,8 @@ Toggles.FPSBoost_AF:OnChanged(function(state)
     end
 end)
 
-Toggles.AutoReconnect:OnChanged(function(state)
-    if state then Func_AutoReconnect() end
+Toggles.AutoRejoin:OnChanged(function(state)
+    if state then Func_AutoRejoin() end
 end)
 
 Toggles.NoGameplayPaused:OnChanged(function(state)
