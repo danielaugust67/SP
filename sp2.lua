@@ -1,9 +1,9 @@
 local env = (type(getgenv) == "function" and getgenv()) or _G
-if env.taolao_Running then
+if env and env.taolao_Running then
     warn("Script already running!")
     return
 end
-env.taolao_Running = true
+if env then env.taolao_Running = true end
 
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game.GameId ~= 0
