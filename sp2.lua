@@ -5788,7 +5788,7 @@ TB_Tabs.Dungeon.T2:AddToggle("DungeonAutofarm", {
                 pcall(queue_on_teleport, code)
             end
         end
-        RejoinServer()
+        RejoinErrorFallback()
     end})
 
     GB.Player.Left.Server:AddToggle("AutoServerhop", { Text = "Auto Serverhop" })
