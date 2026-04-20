@@ -1846,10 +1846,18 @@
         local root = character and character:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
+        local targetDistTP = tonumber(Options.TargetDistTP.Value) or 0
         local distance = (root.Position - targetCF.Position).Magnitude
         local tweenSpeed = Options.TweenSpeed.Value or 180
+        local noDelayNPC = Toggles.NoDelayTP_NPC and Toggles.NoDelayTP_NPC.Value
 
-        if distance > tonumber(Options.TargetDistTP.Value) then
+        if targetDistTP <= 0 and noDelayNPC then
+            root.CFrame = targetCF
+            root.AssemblyLinearVelocity = Vector3.new(0, 0.01, 0)
+            return
+        end
+
+        if distance > targetDistTP then
             local oldNoclip = Toggles.Noclip.Value
             Toggles.Noclip:SetValue(true)
 
@@ -3628,7 +3636,9 @@
         end
 
         if (root.Position - finalPos).Magnitude > 0.1 then
-            if Options.SelectedMovementType.Value == "Teleport" then
+            local forceInstantTP = ((tonumber(Options.TargetDistTP.Value) or 0) <= 0)
+                and (Toggles.NoDelayTP_Mob and Toggles.NoDelayTP_Mob.Value)
+            if Options.SelectedMovementType.Value == "Teleport" or forceInstantTP then
                 root.CFrame = finalDestination
             else
                 local distance = (root.Position - finalPos).Magnitude
@@ -5124,6 +5134,16 @@
         end
     })
 
+    TB_Tabs.Autofarm.T4:AddToggle("NoDelayTP_NPC", {
+        Text = "No Delay TP [NPC] (Target TP = 0)",
+        Default = true,
+    })
+
+    TB_Tabs.Autofarm.T4:AddToggle("NoDelayTP_Mob", {
+        Text = "No Delay TP [Mob/Boss] (Target TP = 0)",
+        Default = true,
+    })
+
     TB_Tabs.Autofarm.T4:AddSlider("M1Speed", {
         Text = "M1 Attack Cooldown",
         Default = 0.2,
@@ -5336,7 +5356,7 @@
         Text = "Auto Skill Combo",
         Default = false,
         Callback = function(state)
-            if state and Toggles.AutoSkill.Value then
+            if state and Toggles.AutoSkill.Value and not Shared.IsLoadingConfig then
                 Toggles.AutoSkill:SetValue(false)
                 Library:Notify("NOTICE: Auto Skill disabled for this to works properly.", 3)
             end
@@ -6697,7 +6717,9 @@
                 Shared.TargetValid = false
             end
 
-            if tick() - Shared.KillTick < (tonumber(Options.TargetTPCD.Value) or 0) then continue end
+            local bypassMobTPCD = ((tonumber(Options.TargetDistTP.Value) or 0) <= 0)
+                and (Toggles.NoDelayTP_Mob and Toggles.NoDelayTP_Mob.Value)
+            if (not bypassMobTPCD) and (tick() - Shared.KillTick < (tonumber(Options.TargetTPCD.Value) or 0)) then continue end
 
             HandleSummons()
 
@@ -6885,7 +6907,11 @@
             if timeout == 1.5 then Remotes.ReqInventory:FireServer() end
         end
 
-        SaveManager:LoadAutoloadConfig()
+        Shared.IsLoadingConfig = true
+        pcall(function()
+            SaveManager:LoadAutoloadConfig()
+        end)
+        Shared.IsLoadingConfig = false
         task.wait(0.25)
 
         if Toggles.AutoRune.Value then
