@@ -5818,7 +5818,7 @@
             Text = "Private Server Link/Code",
             Tooltip = "Paste link dengan privateServerLinkCode=... atau share?code=...",
             Placeholder = "privateServerLinkCode / share link",
-            Default = "",
+            Default = "73004691240341998620161341311347",
         })
         GB.Player.Left.Server:AddToggle("AutoExecuteTeleport", { Text = "Auto Execute On Teleport", Default = false })
 
