@@ -1383,20 +1383,14 @@ local function RejoinServer()
 end
 
 local function RejoinErrorFallback()
-    -- Jika mati / error kick, kita terpaksa lewati ke Root Place (Lobby Sea 1)
+    -- Prioritaskan untuk bergabung ke server yang SAMA (Sangat berguna untuk Private Server)
+    -- Catatan: Roblox MUNGKIN memblokir relog langsung ke dalam Sub-Place/Sea 2 (Restricted) jika JobId ditutup/mati.
     pcall(function()
-        local rootPlaceId = game.PlaceId
-        local success, result = pcall(function()
-            local http = game:GetService("HttpService")
-            local data = http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games?universeIds=" .. game.GameId))
-            return data.data[1].rootPlaceId
-        end)
-        
-        if success and result then
-            rootPlaceId = result
+        if game.JobId and game.JobId ~= "" then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Plr)
+        else
+            TeleportService:Teleport(game.PlaceId, Plr)
         end
-        
-        TeleportService:Teleport(rootPlaceId, Plr)
     end)
 end
 
