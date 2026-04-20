@@ -1427,6 +1427,19 @@
                 if okPrivate then
                     return
                 end
+
+                local okPrivateAsync = pcall(function()
+                    local opts = Instance.new("TeleportOptions")
+                    opts.ReservedServerAccessCode = privateCode
+                    TeleportService:TeleportAsync(rootPlaceId, {Plr}, opts)
+                end)
+                if okPrivateAsync then
+                    return
+                end
+
+                -- Jika user sudah mengisi kode private server, jangan pernah jatuh ke public server.
+                Library:Notify("Private rejoin failed. Check your privateServerLinkCode.", 5)
+                return
             end
 
             TeleportService:Teleport(rootPlaceId, Plr)
