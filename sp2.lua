@@ -425,6 +425,8 @@
         RimuruBoss = GetRemote(RS, "RemoteEvents.RequestSpawnRimuru"),
         AnosBoss = GetRemote(RS, "Remotes.RequestSpawnAnosBoss"),
         TrueAizenBoss = GetRemote(RS, "RemoteEvents.RequestSpawnTrueAizen"),
+        GreatMageBoss = GetRemote(RS, "RemoteEvents.RequestSpawnGreatMage"),
+        TheWorldBoss = GetRemote(RS, "RemoteEvents.RequestSpawnTheWorld"),
 
         ReqInventory = GetRemote(RS, "Remotes.RequestInventory"),
         Ascend = GetRemote(RS, "RemoteEvents.RequestAscend"),
@@ -555,7 +557,7 @@
         AllNPCList = {},
         AllEntitiesList = {},
         SummonList = {},
-        OtherSummonList = {"StrongestHistory", "StrongestToday", "Rimuru", "Anos", "TrueAizen"},
+        OtherSummonList = {"StrongestHistory", "StrongestToday", "Rimuru", "Anos", "TrueAizen", "GreatMage", "TheWorld"},
         Weapon = {"Melee", "Sword", "Power"},
         ManualWeaponClass = {
             ["Invisible"] = "Power",
@@ -2988,6 +2990,10 @@
                 Remotes.AnosBoss:FireServer("Anos", diff)
             elseif lowerName:find("trueaizen") then
                 if Remotes.TrueAizenBoss then Remotes.TrueAizenBoss:FireServer(diff) end
+            elseif lowerName:find("greatmage") then
+                if Remotes.GreatMageBoss then Remotes.GreatMageBoss:FireServer(diff) end
+            elseif lowerName:find("theworld") then
+                if Remotes.TheWorldBoss then Remotes.TheWorldBoss:FireServer(diff) end
             elseif lowerName:find("strongest") then
                 Remotes.JJKSummonBoss:FireServer(remoteArg, diff)
             else
