@@ -647,6 +647,11 @@
         local clean = bossInternalName:gsub("Boss$", "")
         table.insert(Tables.AllBossList, clean)
     end
+    for _, bossName in ipairs({"GreatMage", "TheWorld"}) do
+        if not table.find(Tables.AllBossList, bossName) then
+            table.insert(Tables.AllBossList, bossName)
+        end
+    end
     if not table.find(Tables.AllBossList, "CosmicBeingBoss_Normal") then
         table.insert(Tables.AllBossList, "CosmicBeingBoss_Normal")
     end
@@ -3075,12 +3080,13 @@
             local diff = Options.SelectedOtherSummonDiff.Value
             
             if selected and diff then
-                local keyword = selected:gsub("Strongest", ""):lower()
+                local selectedClean = selected:lower():gsub("%s+", "")
+                local keyword = selectedClean:gsub("strongest", "")
                 
                 local found = false
                 for _, v in pairs(PATH.Mobs:GetChildren()) do
-                    local npcName = v.Name:lower()
-                    if npcName:find(selected:lower()) or (npcName:find("strongest") and npcName:find(keyword)) then
+                    local npcName = v.Name:lower():gsub("%s+", "")
+                    if npcName:find(selectedClean) or (npcName:find("strongest") and npcName:find(keyword)) then
                         found = true break
                     end
                 end
@@ -3705,10 +3711,10 @@
         local selected = Options.SelectedOtherSummon.Value
         if not selected then return nil end
 
-        local lowerSelected = selected:lower()
+        local lowerSelected = selected:lower():gsub("%s+", "")
         
         for _, npc in pairs(PATH.Mobs:GetChildren()) do
-            local name = npc.Name:lower()
+            local name = npc.Name:lower():gsub("%s+", "")
 
             local isMatch = false
             if lowerSelected:find("strongest") then
@@ -5327,6 +5333,11 @@
             for bossInternalName, _ in pairs(Modules.BossConfig.Bosses) do
                 local clean = bossInternalName:gsub("Boss$", "")
                 table.insert(Tables.AllBossList, clean)
+            end
+            for _, bossName in ipairs({"GreatMage", "TheWorld"}) do
+                if not table.find(Tables.AllBossList, bossName) then
+                    table.insert(Tables.AllBossList, bossName)
+                end
             end
             if not table.find(Tables.AllBossList, "CosmicBeingBoss_Normal") then
                 table.insert(Tables.AllBossList, "CosmicBeingBoss_Normal")
