@@ -134,6 +134,53 @@
     local randomIndex = math.random(1, #omg)
     local theChosenOne = omg[randomIndex]
 
+    local function SendLifecycleWebhook(eventName, detailText, color)
+        if type(HttpRequest) ~= "function" then
+            return false, "missing-http-request"
+        end
+
+        local url = ""
+        if Options and Options.WebhookURL then
+            url = Options.WebhookURL.Value or ""
+        end
+
+        if type(url) ~= "string" or url == "" or not url:find("discord.com/api/webhooks/", 1, true) then
+            return false, "invalid-webhook-url"
+        end
+
+        local payload = {
+            ["embeds"] = {{
+                ["title"] = "Script Status: " .. tostring(eventName),
+                ["description"] = tostring(detailText or "-"),
+                ["color"] = tonumber(color) or 3447003,
+                ["fields"] = {
+                    { ["name"] = "Player", ["value"] = "`" .. tostring(Plr and Plr.Name or "Unknown") .. "`", ["inline"] = true },
+                    { ["name"] = "PlaceId", ["value"] = "`" .. tostring(game.PlaceId) .. "`", ["inline"] = true },
+                    { ["name"] = "JobId", ["value"] = "```" .. tostring(game.JobId) .. "```", ["inline"] = false },
+                },
+                ["footer"] = { ["text"] = "taolao lifecycle • " .. os.date("%x %X") }
+            }}
+        }
+
+        local ok, response = pcall(HttpRequest, {
+            Url = url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(payload),
+        })
+
+        if not ok then
+            return false, "request-failed"
+        end
+
+        local statusCode = tonumber(response and (response.StatusCode or response.Status or response.status_code or response.status))
+        if statusCode and (statusCode < 200 or statusCode >= 300) and statusCode ~= 204 then
+            return false, "status-" .. tostring(statusCode)
+        end
+
+        return true
+    end
+
     local eh_success, err = pcall(function()
 
     local hasJoinedDiscord = "fk taolao_DiscordJoined.txt"
@@ -7208,6 +7255,10 @@
         :AddKeyPicker("MenuKeybind", { Default = "U", NoUI = true, Text = "Menu keybind" })
 
     MenuGroup:AddButton("Unload", function()
+        task.spawn(function()
+            SendLifecycleWebhook("OFFLINE", "Script di-unload manual dari menu.", 15158332)
+        end)
+
         getgenv().taolao_Running = false
         Shared.Farm = false
         Cleanup(Connections)
@@ -7314,8 +7365,34 @@
     Library:Notify("Script loaded.", 2)
     Library:Notify("Report bug and give suggestion in Discord!", 5)
 
+    task.spawn(function()
+        task.wait(2)
+        SendLifecycleWebhook("ONLINE", "Script berhasil dijalankan.", 3066993)
+    end)
+
+    task.spawn(function()
+        while getgenv().taolao_Running do
+            task.wait(300)
+            if not getgenv().taolao_Running then break end
+
+            if Toggles and Toggles.SendWebhook and Toggles.SendWebhook.Value then
+                SendLifecycleWebhook("HEARTBEAT", "Script masih berjalan normal.", 3447003)
+            end
+        end
+    end)
+
     end)
 
     if not eh_success then
-        Library:Notify("ERROR: " .. tostring(err), 4)
+        pcall(function()
+            if Library and Library.Notify then
+                Library:Notify("ERROR: " .. tostring(err), 4)
+            else
+                warn("ERROR: " .. tostring(err))
+            end
+        end)
+
+        task.spawn(function()
+            SendLifecycleWebhook("CRASH", tostring(err), 15105570)
+        end)
     end
