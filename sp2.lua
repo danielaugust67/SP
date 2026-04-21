@@ -556,7 +556,7 @@
         AllBossList = {},
         AllNPCList = {},
         AllEntitiesList = {},
-        SummonList = {},
+        SummonList = {"StrongestHistory", "StrongestToday", "Rimuru", "Anos", "TrueAizen", "GreatMage", "TheWorld"},
         OtherSummonList = {"StrongestHistory", "StrongestToday", "Rimuru", "Anos", "TrueAizen", "GreatMage", "TheWorld"},
         Weapon = {"Melee", "Sword", "Power"},
         ManualWeaponClass = {
