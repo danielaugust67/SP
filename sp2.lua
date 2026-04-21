@@ -239,6 +239,7 @@
             Inv = {},
             Accessories = {},
             RawWeapCache = { Sword = {}, Melee = {} },
+            StartInvCounts = nil,
         },
 
         Farm = true,
@@ -832,9 +833,11 @@
         local totalDust = 0
 
         for key, data in pairs(itemSourceTable) do
-            local name, qty
+            local name, qty, deltaQty
             if type(data) == "table" and data.name then
-                name = tostring(data.name); qty = tonumber(data.quantity) or 1
+                name = tostring(data.name)
+                qty = tonumber(data.quantity) or 1
+                deltaQty = tonumber(data.delta)
             else
                 name = tostring(key); qty = tonumber(data) or 1
             end
@@ -852,7 +855,14 @@
                 end
             end
 
-            local entryText = isNewItems and string.format("+ [%d] %s [Total: %s]", qty, name, CommaFormat(totalInInv)) or string.format("- %s: %s", name, CommaFormat(qty))
+            local entryText
+            if isNewItems then
+                entryText = string.format("+ [%d] %s [Total: %s]", qty, name, CommaFormat(totalInInv))
+            elseif deltaQty ~= nil then
+                entryText = string.format("- %s: %s (%+d)", name, CommaFormat(qty), deltaQty)
+            else
+                entryText = string.format("- %s: %s", name, CommaFormat(qty))
+            end
 
             if name:find("Chest") or name == "Aura Crate" or name == "Cosmetic Crate" then
                 local weight = 99
@@ -911,6 +921,17 @@
         Shared.InventorySynced = true
         if category == "Items" then 
             Shared.Cached.Inv = data or {}
+
+            if not Shared.Cached.StartInvCounts then
+                local snapshot = {}
+                for _, item in pairs(data or {}) do
+                    local itemName = tostring(item.name or "")
+                    if itemName ~= "" then
+                        snapshot[itemName] = tonumber(item.quantity) or 0
+                    end
+                end
+                Shared.Cached.StartInvCounts = snapshot
+            end
             
             table.clear(Tables.OwnedItem)
             for _, item in pairs(data) do
@@ -1229,8 +1250,15 @@
 
         if selected["All Items"] then
             local filteredInv = {}
+            local startCounts = Shared.Cached.StartInvCounts or {}
             for _, item in pairs(Shared.Cached.Inv or {}) do
-                if IsAllowed(item.name) then table.insert(filteredInv, item) end
+                if IsAllowed(item.name) then
+                    table.insert(filteredInv, {
+                        name = item.name,
+                        quantity = item.quantity,
+                        delta = (tonumber(item.quantity) or 0) - (tonumber(startCounts[item.name]) or 0)
+                    })
+                end
             end
 
             if #filteredInv > 0 then
