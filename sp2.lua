@@ -1109,6 +1109,22 @@
         if not IsValidWebhookURL(url) then return end
 
         local selected = Options.SelectedData.Value or {}
+        local hasSelectedData = false
+        for _, enabled in pairs(selected) do
+            if enabled then
+                hasSelectedData = true
+                break
+            end
+        end
+
+        if not hasSelectedData then
+            selected = {
+                ["Name"] = true,
+                ["Stats"] = true,
+                ["New Items"] = true,
+            }
+        end
+
         local allowedRarity = Options.SelectedItemRarity.Value or {}
         
         local data = Plr.Data
@@ -1150,7 +1166,11 @@
             if next(filteredNew) then
                 desc = desc .. "✨ **New Items**\n"
                 desc = desc .. GetFormattedItemSections(filteredNew, true) .. "\n"
+            else
+                desc = desc .. "✨ **New Items**\n- No new drops (or filtered by rarity).\n\n"
             end
+        elseif selected["New Items"] then
+            desc = desc .. "✨ **New Items**\n- No new drops yet.\n\n"
         end
 
         if selected["All Items"] then
@@ -1163,6 +1183,8 @@
                 desc = desc .. "---"
                 desc = desc .. "\n🎒 **Inventory**\n"
                 desc = desc .. GetFormattedItemSections(filteredInv, false)
+            else
+                desc = desc .. "---\n🎒 **Inventory**\n- No items matched current rarity filter.\n"
             end
         end
 
@@ -2711,8 +2733,8 @@
         return nil
     end
 
-    local function SendBossDefeatedWebhook(bossDisplayName, npcName)
-        if not (Toggles.NotifyBossDefeatWebhook and Toggles.NotifyBossDefeatWebhook.Value) then return end
+    local function SendBossDefeatedWebhook(bossDisplayName, npcName, forceSend)
+        if not forceSend and not (Toggles.NotifyBossDefeatWebhook and Toggles.NotifyBossDefeatWebhook.Value) then return end
         if not (Options.WebhookURL and IsValidWebhookURL(Options.WebhookURL.Value)) then return end
 
         local payload = {
@@ -2734,11 +2756,41 @@
         end
 
         task.spawn(function()
-            SendWebhookRequest(payload, {
+            local ok = SendWebhookRequest(payload, {
                 maxAttempts = 3,
                 baseDelay = 1,
+                notifyOnFail = forceSend == true,
             })
+
+            if forceSend == true then
+                if ok then
+                    Library:Notify("Boss defeat webhook test sent.", 4)
+                else
+                    Library:Notify("Boss defeat webhook test failed.", 4)
+                end
+            end
         end)
+    end
+
+    local function TestBossDefeatWebhook()
+        local url = Options.WebhookURL and Options.WebhookURL.Value or ""
+        if not IsValidWebhookURL(url) then
+            Library:Notify("Invalid Webhook URL.", 4)
+            return
+        end
+
+        local selected = (Options.SelectedBosses and Options.SelectedBosses.Value) or {}
+        local bossDisplayName = nil
+        for name, enabled in pairs(selected) do
+            if enabled then
+                bossDisplayName = name
+                break
+            end
+        end
+
+        bossDisplayName = bossDisplayName or "Test Boss"
+        local npcName = bossDisplayName:gsub("%s+", "") .. "Boss"
+        SendBossDefeatedWebhook(bossDisplayName, npcName, true)
     end
 
     local function NotifyBossDefeated(model)
@@ -5104,7 +5156,7 @@
     GB.Webhook.Left.Config:AddDropdown("SelectedData", {
         Text = "Select Data (s)",
         Values = {"Name", "Stats", "New Items", "All Items"},
-        Default = nil,
+        Default = {"Name", "Stats", "New Items"},
         Multi = true,
         Searchable = true,
     })
@@ -5137,6 +5189,10 @@
         Default = false,
         Disabled = not Support.Webhook,
     })
+
+    GB.Webhook.Left.Config:AddButton("Test Boss Defeat Webhook", function()
+        TestBossDefeatWebhook()
+    end)
 
     GB.Webhook.Left.Config:AddToggle("SendWebhook", {
         Text = "Send Webhook",
