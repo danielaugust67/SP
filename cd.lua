@@ -4,6 +4,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
 local localPlayer = Players.LocalPlayer
 
 -- =====================
@@ -30,6 +31,7 @@ local movementType = "Tween"
 local tweenSpeed = 180
 local autoEquipEnabled = false
 local equipThread = nil
+local antiAfkConnection = nil
 
 -- =====================
 -- CORE: GET CHARACTER
@@ -554,6 +556,32 @@ SettingsTab:CreateSlider({
 })
 
 SettingsTab:CreateDivider()
+SettingsTab:CreateSection("Misc")
+
+SettingsTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = false,
+    Flag = "AntiAfkToggle",
+    Callback = function(value)
+        if value then
+            if not antiAfkConnection then
+                antiAfkConnection = localPlayer.Idled:Connect(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                end)
+            end
+            Rayfield:Notify({ Title = "Anti AFK", Content = "Anti AFK Enabled!", Duration = 2, Image = 4483362458 })
+        else
+            if antiAfkConnection then
+                antiAfkConnection:Disconnect()
+                antiAfkConnection = nil
+            end
+            Rayfield:Notify({ Title = "Anti AFK", Content = "Anti AFK Disabled!", Duration = 2, Image = 4483362458 })
+        end
+    end,
+})
+
+SettingsTab:CreateDivider()
 SettingsTab:CreateSection("Danger Zone")
 
 SettingsTab:CreateButton({
@@ -563,6 +591,10 @@ SettingsTab:CreateButton({
         stopOrbit()
         stopAutoEquip()
         if monitorThread then task.cancel(monitorThread) end
+        if antiAfkConnection then
+            antiAfkConnection:Disconnect()
+            antiAfkConnection = nil
+        end
         Rayfield:Destroy()
     end,
 })
