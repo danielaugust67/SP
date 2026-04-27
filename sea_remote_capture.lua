@@ -1,179 +1,424 @@
-local env = (type(getgenv) == "function" and getgenv()) or _G
-if env and env.seaRemoteCaptureRunning then
-    warn("sea_remote_capture already running")
-    return
+-- Wave Monitor + Orbit CrystalModel
+-- Rayfield UI
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+
+-- =====================
+-- CONFIG
+-- =====================
+local TARGET_WAVE = 51
+local RESET_COUNT = 4
+local CHECK_INTERVAL = 1
+local RESET_DELAY = 2
+
+-- =====================
+-- STATE
+-- =====================
+local isRunning = false
+local hasReset = false
+local monitorThread = nil
+local orbitEnabled = false
+local orbitThread = nil
+local orbitRadius = 8
+local orbitSpeed = 1.5
+local orbitHeight = 0
+local movementType = "Tween"
+local tweenSpeed = 180
+
+-- =====================
+-- CORE: GET CRYSTAL TARGET
+-- =====================
+local function getCrystalCFrame()
+    local model = workspace:FindFirstChild("CrystalModel")
+    if not model then return nil end
+
+    -- Coba pivot dulu, fallback ke PrimaryPart, lalu BasePart
+    if model.PrimaryPart then
+        return model:GetPivot()
+    end
+
+    for _, v in ipairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then
+            return v.CFrame
+        end
+    end
+
+    return nil
 end
-if env then env.seaRemoteCaptureRunning = true end
 
-repeat task.wait() until game:IsLoaded()
-
-local function missing(t, f, fallback)
-    if type(f) == t then return f end
-    return fallback
+local function getCrystalPosition()
+    local cf = getCrystalCFrame()
+    return cf and cf.Position or nil
 end
 
-local Support = {
-    Clipboard = (typeof(setclipboard) == "function"),
-    HookNamecall = (typeof(hookmetamethod) == "function" and typeof(getnamecallmethod) == "function"),
-    FileIO = (typeof(writefile) == "function" and typeof(isfile) == "function"),
-    AppendFile = (typeof(appendfile) == "function"),
-}
-
-local STATUS_FILE = "sea_remote_capture.status.txt"
-local LOG_FILE = "sea_remote_capture.log.txt"
-
-local function Timestamp()
-    return os.date("%Y-%m-%d %H:%M:%S")
+-- =====================
+-- CORE: WAVE FUNCTIONS
+-- =====================
+local function getWaveFrame()
+    local gui = localPlayer.PlayerGui:FindFirstChild("DungeonUI")
+    if not gui then return nil end
+    local content = gui:FindFirstChild("ContentFrame")
+    if not content then return nil end
+    return content:FindFirstChild("WaveFrame")
 end
 
-local function SaveStatus(text)
-    if not Support.FileIO then return end
-    pcall(function()
-        writefile(STATUS_FILE, string.format("[%s] %s", Timestamp(), text))
-    end)
+local function getCurrentWave()
+    local waveFrame = getWaveFrame()
+    if not waveFrame then return nil end
+    for _, child in ipairs(waveFrame:GetDescendants()) do
+        if child:IsA("TextLabel") then
+            local num = tonumber(child.Text:match("%d+"))
+            if num then return num end
+        end
+    end
+    return nil
 end
 
-local function Log(text)
-    local line = string.format("[%s] %s", Timestamp(), text)
-    warn("[SeaCapture] " .. text)
+local function resetCharacter()
+    local char = localPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Health = 0 end
+    end
+end
 
-    if not Support.FileIO then return end
-    pcall(function()
-        if Support.AppendFile then
-            if not isfile(LOG_FILE) then
-                writefile(LOG_FILE, line .. "\n")
-            else
-                appendfile(LOG_FILE, line .. "\n")
+-- =====================
+-- CORE: MOVE FUNCTION
+-- =====================
+local function MoveToTarget(root, targetCF)
+    if not root then return end
+    local gap = (root.Position - targetCF.Position).Magnitude
+
+    if movementType == "Teleport" then
+        root.CFrame = targetCF
+    else
+        if gap > 0.1 then
+            local duration = math.max(gap / tweenSpeed, 0.03)
+            TweenService:Create(
+                root,
+                TweenInfo.new(duration, Enum.EasingStyle.Linear),
+                { CFrame = targetCF }
+            ):Play()
+        end
+    end
+
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+end
+
+-- =====================
+-- CORE: ORBIT LOGIC
+-- =====================
+local function stopOrbit()
+    orbitEnabled = false
+    if orbitThread then
+        task.cancel(orbitThread)
+        orbitThread = nil
+    end
+end
+
+local function startOrbit()
+    stopOrbit()
+    orbitEnabled = true
+
+    orbitThread = task.spawn(function()
+        while orbitEnabled do
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local crystalPos = getCrystalPosition()
+
+            if root and crystalPos then
+                local ang = tick() * orbitSpeed
+
+                local orbitOffset = Vector3.new(
+                    math.cos(ang) * orbitRadius,
+                    orbitHeight,
+                    math.sin(ang) * orbitRadius
+                )
+
+                local finalPos = crystalPos + orbitOffset
+                local targetCF = CFrame.lookAt(finalPos, crystalPos)
+
+                MoveToTarget(root, targetCF)
             end
-        else
-            writefile(LOG_FILE, line .. "\n")
+
+            task.wait(0.03)
         end
     end)
 end
 
-if not Support.HookNamecall then
-    SaveStatus("FAILED: hookmetamethod/getnamecallmethod not supported")
-    Log("hookmetamethod/getnamecallmethod not supported by this executor")
-    return
-end
+-- =====================
+-- RAYFIELD WINDOW
+-- =====================
+local Window = Rayfield:CreateWindow({
+    Name = "Wave Monitor",
+    Icon = 0,
+    LoadingTitle = "Wave Monitor",
+    LoadingSubtitle = "Crystal Defense",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+})
 
-local function GetInstanceExpr(inst)
-    if typeof(inst) ~= "Instance" then return "nil" end
-    local parts = {}
-    local cur = inst
-    while cur and cur ~= game do
-        table.insert(parts, 1, cur.Name)
-        cur = cur.Parent
-    end
-    local expr = "game"
-    for _, p in ipairs(parts) do
-        expr = expr .. string.format(":WaitForChild(%q)", p)
-    end
-    return expr
-end
+local MonitorTab = Window:CreateTab("Monitor", 4483362458)
+local OrbitTab = Window:CreateTab("Orbit", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
-local function SerializeArg(v, depth)
-    depth = depth or 0
-    if depth > 2 then return "nil" end
+-- =====================
+-- MONITOR TAB
+-- =====================
+MonitorTab:CreateSection("Wave Info")
+local waveLabel = MonitorTab:CreateLabel("Current Wave: --")
+local statusLabel = MonitorTab:CreateLabel("Status: Idle")
+MonitorTab:CreateDivider()
 
-    local t = typeof(v)
-    if t == "string" then
-        return string.format("%q", v)
-    elseif t == "number" or t == "boolean" then
-        return tostring(v)
-    elseif t == "nil" then
-        return "nil"
-    elseif t == "EnumItem" then
-        return tostring(v)
-    elseif t == "Instance" then
-        return GetInstanceExpr(v)
-    elseif t == "Vector3" then
-        return string.format("Vector3.new(%s, %s, %s)", tostring(v.X), tostring(v.Y), tostring(v.Z))
-    elseif t == "CFrame" then
-        local c = {v:GetComponents()}
-        return string.format(
-            "CFrame.new(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            tostring(c[1]), tostring(c[2]), tostring(c[3]), tostring(c[4]), tostring(c[5]), tostring(c[6]),
-            tostring(c[7]), tostring(c[8]), tostring(c[9]), tostring(c[10]), tostring(c[11]), tostring(c[12])
-        )
-    elseif t == "table" then
-        local items, n = {}, 0
-        for k, val in pairs(v) do
-            n = n + 1
-            if n > 8 then break end
-            table.insert(items, string.format("[%s]=%s", SerializeArg(k, depth + 1), SerializeArg(val, depth + 1)))
+MonitorTab:CreateSection("Control")
+MonitorTab:CreateToggle({
+    Name = "Auto Reset at Wave " .. TARGET_WAVE,
+    CurrentValue = false,
+    Flag = "WaveMonitorToggle",
+    Callback = function(value)
+        isRunning = value
+        if isRunning then
+            hasReset = false
+            statusLabel:Set("Status: Running...")
+            monitorThread = task.spawn(function()
+                while isRunning do
+                    task.wait(CHECK_INTERVAL)
+                    local wave = getCurrentWave()
+                    if wave then
+                        waveLabel:Set("Current Wave: " .. wave)
+                        if wave == TARGET_WAVE and not hasReset then
+                            hasReset = true
+                            for i = 1, RESET_COUNT do
+                                if not isRunning then break end
+                                statusLabel:Set(string.format("Status: Resetting %d/%d", i, RESET_COUNT))
+                                Rayfield:Notify({
+                                    Title = "Wave Monitor",
+                                    Content = string.format("Reset %d/%d - Wave %d!", i, RESET_COUNT, TARGET_WAVE),
+                                    Duration = 2,
+                                    Image = 4483362458,
+                                })
+                                resetCharacter()
+                                task.wait(RESET_DELAY)
+                            end
+                            statusLabel:Set("Status: Done! Watching...")
+                        elseif wave ~= TARGET_WAVE then
+                            hasReset = false
+                            statusLabel:Set("Status: Running...")
+                        end
+                    else
+                        waveLabel:Set("Current Wave: N/A")
+                        statusLabel:Set("Status: WaveFrame not found!")
+                    end
+                end
+            end)
+        else
+            if monitorThread then
+                task.cancel(monitorThread)
+                monitorThread = nil
+            end
+            waveLabel:Set("Current Wave: --")
+            statusLabel:Set("Status: Idle")
         end
-        return "{" .. table.concat(items, ", ") .. "}"
-    end
+    end,
+})
 
-    return "nil"
-end
+MonitorTab:CreateDivider()
+MonitorTab:CreateSection("Manual")
 
-local function IsSeaTransitionRemote(remote, args)
-    local key = ((remote.Name or "") .. " " .. remote:GetFullName()):lower()
-    if key:find("teleport") or key:find("portal") or key:find("sea") or key:find("world") then
-        return true
-    end
+MonitorTab:CreateButton({
+    Name = "Reset Character Now",
+    Callback = function()
+        resetCharacter()
+        Rayfield:Notify({ Title = "Wave Monitor", Content = "Character manually reset!", Duration = 2, Image = 4483362458 })
+    end,
+})
 
-    local first = args[1]
-    if type(first) == "string" then
-        local a = first:lower()
-        if a:find("sea") or a:find("world") then
-            return true
+MonitorTab:CreateButton({
+    Name = "Debug: Print WaveFrame Labels",
+    Callback = function()
+        local wf = getWaveFrame()
+        if not wf then
+            Rayfield:Notify({ Title = "Debug", Content = "WaveFrame not found!", Duration = 3, Image = 4483362458 })
+            return
         end
-    end
-
-    return false
-end
-
-local Capture = {
-    LastCall = "",
-    LastTime = 0,
-    Count = 0,
-}
-
-SaveStatus("RUNNING")
-Log("started. Trigger sea/portal teleport to capture remote.")
-
-task.spawn(function()
-    while env and env.seaRemoteCaptureRunning do
-        SaveStatus(string.format("RUNNING | captures=%d", Capture.Count))
-        task.wait(15)
-    end
-end)
-
-local safeNewCClosure = missing("function", newcclosure, function(f) return f end)
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", safeNewCClosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-
-    if method and (method == "FireServer" or method == "InvokeServer")
-        and typeof(self) == "Instance"
-        and (self:IsA("RemoteEvent") or self:IsA("RemoteFunction"))
-        and IsSeaTransitionRemote(self, args)
-    then
-        local serializedArgs = {}
-        for i = 1, #args do
-            table.insert(serializedArgs, SerializeArg(args[i]))
+        for _, v in ipairs(wf:GetDescendants()) do
+            if v:IsA("TextLabel") then
+                print("[Debug]", v.ClassName, v.Name, "|", v.Text)
+            end
         end
+        Rayfield:Notify({ Title = "Debug", Content = "Check console for labels.", Duration = 3, Image = 4483362458 })
+    end,
+})
 
-        Capture.LastCall = string.format(
-            "%s:%s(%s)",
-            GetInstanceExpr(self),
-            method,
-            table.concat(serializedArgs, ", ")
-        )
-        Capture.LastTime = tick()
-        Capture.Count = Capture.Count + 1
+-- =====================
+-- ORBIT TAB
+-- =====================
+OrbitTab:CreateSection("Target")
+local crystalStatusLabel = OrbitTab:CreateLabel("Target: workspace.CrystalModel")
+OrbitTab:CreateDivider()
 
-        if Support.Clipboard and setclipboard then
-            pcall(setclipboard, Capture.LastCall)
+OrbitTab:CreateSection("Orbit Control")
+
+OrbitTab:CreateButton({
+    Name = "Teleport to Crystal",
+    Callback = function()
+        local char = localPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local crystalPos = getCrystalPosition()
+        if root and crystalPos then
+            root.CFrame = CFrame.new(crystalPos + Vector3.new(0, 0, orbitRadius))
+            Rayfield:Notify({ Title = "Orbit", Content = "Teleported to CrystalModel!", Duration = 2, Image = 4483362458 })
+        else
+            Rayfield:Notify({ Title = "Orbit", Content = "CrystalModel not found!", Duration = 3, Image = 4483362458 })
         end
+    end,
+})
 
-        SaveStatus(string.format("RUNNING | captures=%d", Capture.Count))
-        Log("copied remote #" .. tostring(Capture.Count) .. ": " .. Capture.LastCall)
-    end
+OrbitTab:CreateToggle({
+    Name = "Enable Orbit",
+    CurrentValue = false,
+    Flag = "OrbitToggle",
+    Callback = function(value)
+        if value then
+            local crystalPos = getCrystalPosition()
+            if not crystalPos then
+                Rayfield:Notify({ Title = "Orbit", Content = "CrystalModel not found in workspace!", Duration = 3, Image = 4483362458 })
+                return
+            end
+            startOrbit()
+            Rayfield:Notify({ Title = "Orbit", Content = "Orbiting CrystalModel!", Duration = 2, Image = 4483362458 })
+        else
+            stopOrbit()
+            Rayfield:Notify({ Title = "Orbit", Content = "Orbit stopped.", Duration = 2, Image = 4483362458 })
+        end
+    end,
+})
 
-    return oldNamecall(self, ...)
-end))
+OrbitTab:CreateDivider()
+OrbitTab:CreateSection("Orbit Settings")
+
+OrbitTab:CreateSlider({
+    Name = "Orbit Radius",
+    Range = {2, 30},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = orbitRadius,
+    Flag = "OrbitRadius",
+    Callback = function(v) orbitRadius = v end,
+})
+
+OrbitTab:CreateSlider({
+    Name = "Orbit Speed",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = orbitSpeed,
+    Flag = "OrbitSpeed",
+    Callback = function(v) orbitSpeed = v end,
+})
+
+OrbitTab:CreateSlider({
+    Name = "Height Offset",
+    Range = {-10, 10},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = orbitHeight,
+    Flag = "OrbitHeight",
+    Callback = function(v) orbitHeight = v end,
+})
+
+OrbitTab:CreateDivider()
+OrbitTab:CreateSection("Movement Type")
+
+OrbitTab:CreateDropdown({
+    Name = "Movement Mode",
+    Options = {"Tween", "Teleport"},
+    CurrentOption = {"Tween"},
+    Flag = "MovementMode",
+    Callback = function(opt)
+        movementType = opt[1]
+    end,
+})
+
+OrbitTab:CreateSlider({
+    Name = "Tween Speed",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = " studs/s",
+    CurrentValue = tweenSpeed,
+    Flag = "TweenSpeed",
+    Callback = function(v) tweenSpeed = v end,
+})
+
+-- =====================
+-- SETTINGS TAB
+-- =====================
+SettingsTab:CreateSection("Wave Configuration")
+
+SettingsTab:CreateSlider({
+    Name = "Target Wave",
+    Range = {1, 100},
+    Increment = 1,
+    CurrentValue = TARGET_WAVE,
+    Flag = "TargetWave",
+    Callback = function(v)
+        TARGET_WAVE = v
+        hasReset = false
+    end,
+})
+
+SettingsTab:CreateSlider({
+    Name = "Reset Count",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = RESET_COUNT,
+    Flag = "ResetCount",
+    Callback = function(v) RESET_COUNT = v end,
+})
+
+SettingsTab:CreateSlider({
+    Name = "Reset Delay",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = "s",
+    CurrentValue = RESET_DELAY,
+    Flag = "ResetDelay",
+    Callback = function(v) RESET_DELAY = v end,
+})
+
+SettingsTab:CreateSlider({
+    Name = "Check Interval",
+    Range = {1, 5},
+    Increment = 1,
+    Suffix = "s",
+    CurrentValue = CHECK_INTERVAL,
+    Flag = "CheckInterval",
+    Callback = function(v) CHECK_INTERVAL = v end,
+})
+
+SettingsTab:CreateDivider()
+SettingsTab:CreateSection("Danger Zone")
+
+SettingsTab:CreateButton({
+    Name = "Unload Script",
+    Callback = function()
+        isRunning = false
+        stopOrbit()
+        if monitorThread then task.cancel(monitorThread) end
+        Rayfield:Destroy()
+    end,
+})
+
+-- Init
+Rayfield:Notify({
+    Title = "Wave Monitor Loaded",
+    Content = "Monitor & Crystal Orbit ready!",
+    Duration = 4,
+    Image = 4483362458,
+})
